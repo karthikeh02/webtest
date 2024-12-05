@@ -1,264 +1,262 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>WebRTC Text, Audio, Picture, and Video Chat</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            padding: 0;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 0;
+      }
 
-        h2 {
-            margin: 20px 0;
-        }
+      h2 {
+        margin: 20px 0;
+      }
 
-        #chat {
-            width: 90%;
-            max-width: 500px;
-            height: 400px;
-            border: 1px solid black;
-            margin-bottom: 20px;
-            padding: 10px;
-            overflow-y: scroll;
-        }
+      #chat {
+        width: 90%;
+        max-width: 500px;
+        height: 400px;
+        border: 1px solid black;
+        margin-bottom: 20px;
+        padding: 10px;
+        overflow-y: scroll;
+      }
 
-        #controls {
-            width: 90%;
-            max-width: 500px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
+      #controls {
+        width: 90%;
+        max-width: 500px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
 
-        input, button {
-            padding: 10px;
-            border: 1px solid black;
-            border-radius: 4px;
-        }
+      input,
+      button {
+        padding: 10px;
+        border: 1px solid black;
+        border-radius: 4px;
+      }
 
-        button {
-            cursor: pointer;
-        }
+      button {
+        cursor: pointer;
+      }
 
-        button:disabled {
-            background-color: lightgray;
-            cursor: not-allowed;
-        }
+      button:disabled {
+        background-color: lightgray;
+        cursor: not-allowed;
+      }
 
-        #fileInput {
-            display: none;
-        }
+      #fileInput {
+        display: none;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h2>WebRTC Chat</h2>
     <div id="chat"></div>
     <div id="controls">
-        <input type="text" id="messageInput" placeholder="Type a message...">
-        <button id="sendTextButton">Send Text</button>
-        <button id="recordButton">Record Voice</button>
-        <button id="stopButton" disabled>Stop</button>
-        <button id="sendVoiceButton" disabled>Send Voice</button>
-        <button id="imageButton">Send Picture</button>
-        <button id="videoButton">Send Video</button>
-        <input type="file" id="fileInput" accept="image/*,video/*">
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <button id="sendTextButton">Send Text</button>
+      <button id="recordButton">Record Voice</button>
+      <button id="stopButton" disabled>Stop</button>
+      <button id="sendVoiceButton" disabled>Send Voice</button>
+      <button id="imageButton">Send Picture</button>
+      <button id="videoButton">Send Video</button>
+      <input type="file" id="fileInput" accept="image/*,video/*" />
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
     <script>
-        const socket = io();
-        const chatDiv = document.getElementById('chat');
-        const messageInput = document.getElementById('messageInput');
-        const sendTextButton = document.getElementById('sendTextButton');
-        const recordButton = document.getElementById('recordButton');
-        const stopButton = document.getElementById('stopButton');
-        const sendVoiceButton = document.getElementById('sendVoiceButton');
-        const imageButton = document.getElementById('imageButton');
-        const videoButton = document.getElementById('videoButton');
-        const fileInput = document.getElementById('fileInput');
+      const socket = io("http://3.7.253.47:3001");
+      const chatDiv = document.getElementById("chat");
+      const messageInput = document.getElementById("messageInput");
+      const sendTextButton = document.getElementById("sendTextButton");
+      const recordButton = document.getElementById("recordButton");
+      const stopButton = document.getElementById("stopButton");
+      const sendVoiceButton = document.getElementById("sendVoiceButton");
+      const imageButton = document.getElementById("imageButton");
+      const videoButton = document.getElementById("videoButton");
+      const fileInput = document.getElementById("fileInput");
 
-        let mediaRecorder;
-        let audioChunks = [];
+      let mediaRecorder;
+      let audioChunks = [];
 
-        // Send text messages
-        // sendTextButton.onclick = () => {
-        //     const message = messageInput.value.trim();
-        //     if (message) {
-        //         socket.emit('chat message', { type: 'text', data: message });
-        //         appendMessage(`You: ${message}`, 'text');
-        //         messageInput.value = '';
-        //     }
-        // };
+      // Send text messages
+      // sendTextButton.onclick = () => {
+      //     const message = messageInput.value.trim();
+      //     if (message) {
+      //         socket.emit('chat message', { type: 'text', data: message });
+      //         appendMessage(`You: ${message}`, 'text');
+      //         messageInput.value = '';
+      //     }
+      // };
 
+      sendTextButton.onclick = () => {
+        const message = messageInput.value.trim();
+        if (message) {
+          const msg = { type: "text", data: message }; // Prepare the message
+          appendMessage(`You: ${message}`, "text"); // Append locally
+          socket.emit("chat message", msg); // Send to server
+          messageInput.value = ""; // Clear the input
+        }
+      };
 
-        sendTextButton.onclick = () => {
-    const message = messageInput.value.trim();
-    if (message) {
-        const msg = { type: 'text', data: message }; // Prepare the message
-        appendMessage(`You: ${message}`, 'text');   // Append locally
-        socket.emit('chat message', msg);          // Send to server
-        messageInput.value = '';                   // Clear the input
-    }
-};
+      // Start recording voice messages
+      recordButton.onclick = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        mediaRecorder = new MediaRecorder(stream);
 
-
-        // Start recording voice messages
-        recordButton.onclick = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-
-            mediaRecorder.ondataavailable = event => {
-                audioChunks.push(event.data);
-            };
-
-            mediaRecorder.onstop = () => {
-                sendVoiceButton.disabled = false; // Enable sending after recording stops
-            };
-
-            mediaRecorder.start();
-            recordButton.disabled = true;
-            stopButton.disabled = false;
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunks.push(event.data);
         };
 
-        // Stop recording
-        stopButton.onclick = () => {
-            mediaRecorder.stop();
-            recordButton.disabled = false;
-            stopButton.disabled = true;
+        mediaRecorder.onstop = () => {
+          sendVoiceButton.disabled = false; // Enable sending after recording stops
         };
 
-        // Send voice messages
-        sendVoiceButton.onclick = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            audioChunks = []; // Clear the chunks
+        mediaRecorder.start();
+        recordButton.disabled = true;
+        stopButton.disabled = false;
+      };
 
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64Audio = reader.result.split(',')[1];
-                socket.emit('chat message', { type: 'audio', data: base64Audio });
-                appendAudioMessage(base64Audio, 'You');
-            };
-            reader.readAsDataURL(audioBlob);
+      // Stop recording
+      stopButton.onclick = () => {
+        mediaRecorder.stop();
+        recordButton.disabled = false;
+        stopButton.disabled = true;
+      };
 
-            sendVoiceButton.disabled = true; // Disable the button after sending
+      // Send voice messages
+      sendVoiceButton.onclick = () => {
+        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+        audioChunks = []; // Clear the chunks
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64Audio = reader.result.split(",")[1];
+          socket.emit("chat message", { type: "audio", data: base64Audio });
+          appendAudioMessage(base64Audio, "You");
         };
+        reader.readAsDataURL(audioBlob);
 
-        // Send image or video
-        fileInput.onchange = () => {
-            const file = fileInput.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64Data = reader.result.split(',')[1];
-                    const type = file.type.startsWith('image/') ? 'image' : 'video';
-                    socket.emit('chat message', { type, data: base64Data });
-                    if (type === 'image') {
-                        appendImageMessage(base64Data, 'You');
-                    } else {
-                        appendVideoMessage(base64Data, 'You');
-                    }
-                };
-                reader.readAsDataURL(file);
+        sendVoiceButton.disabled = true; // Disable the button after sending
+      };
+
+      // Send image or video
+      fileInput.onchange = () => {
+        const file = fileInput.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Data = reader.result.split(",")[1];
+            const type = file.type.startsWith("image/") ? "image" : "video";
+            socket.emit("chat message", { type, data: base64Data });
+            if (type === "image") {
+              appendImageMessage(base64Data, "You");
+            } else {
+              appendVideoMessage(base64Data, "You");
             }
-        };
-
-        imageButton.onclick = () => fileInput.click(); // Trigger file input for images
-        videoButton.onclick = () => fileInput.click(); // Trigger file input for videos
-
-        // Append text messages
-        function appendMessage(content, type) {
-    const messageDiv = document.createElement('div');
-    if (type === 'text') {
-        messageDiv.textContent = content;
-    }
-    chatDiv.appendChild(messageDiv);
-    chatDiv.scrollTop = chatDiv.scrollHeight;
-}
-
-
-        // Append audio messages
-        function appendAudioMessage(base64Audio, sender) {
-            const div = document.createElement('div');
-            div.textContent = `${sender}: `;
-            const audio = document.createElement('audio');
-            audio.controls = true;
-            audio.src = `data:audio/webm;base64,${base64Audio}`;
-            div.appendChild(audio);
-            chatDiv.appendChild(div);
-            chatDiv.scrollTop = chatDiv.scrollHeight;
+          };
+          reader.readAsDataURL(file);
         }
+      };
 
-        // Append image messages
-        function appendImageMessage(base64Image, sender) {
-            const div = document.createElement('div');
-            div.textContent = `${sender}: `;
-            const img = document.createElement('img');
-            img.src = `data:image/*;base64,${base64Image}`;
-            img.style.maxWidth = '100%';
-            div.appendChild(img);
-            chatDiv.appendChild(div);
-            chatDiv.scrollTop = chatDiv.scrollHeight;
+      imageButton.onclick = () => fileInput.click(); // Trigger file input for images
+      videoButton.onclick = () => fileInput.click(); // Trigger file input for videos
+
+      // Append text messages
+      function appendMessage(content, type) {
+        const messageDiv = document.createElement("div");
+        if (type === "text") {
+          messageDiv.textContent = content;
         }
+        chatDiv.appendChild(messageDiv);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
 
-        // Append video messages
-        function appendVideoMessage(base64Video, sender) {
-            const div = document.createElement('div');
-            div.textContent = `${sender}: `;
-            const video = document.createElement('video');
-            video.controls = true;
-            video.src = `data:video/*;base64,${base64Video}`;
-            video.style.maxWidth = '100%';
-            div.appendChild(video);
-            chatDiv.appendChild(div);
-            chatDiv.scrollTop = chatDiv.scrollHeight;
-        }
+      // Append audio messages
+      function appendAudioMessage(base64Audio, sender) {
+        const div = document.createElement("div");
+        div.textContent = `${sender}: `;
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = `data:audio/webm;base64,${base64Audio}`;
+        div.appendChild(audio);
+        chatDiv.appendChild(div);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
 
-        // Handle incoming messages
-//         socket.on('chat message', (msg) => {
-//     if (msg.type === 'text') {
-//         appendMessage(msg.data, 'text'); // Text messages
-//     } else if (msg.type === 'audio') {
-//         appendAudioMessage(msg.data, 'Other'); // Audio messages
-//     } else if (msg.type === 'image') {
-//         appendImageMessage(msg.data, 'Other'); // Image messages
-//     } else if (msg.type === 'video') {
-//         appendVideoMessage(msg.data, 'Other'); // Video messages
-//     }
-// });
+      // Append image messages
+      function appendImageMessage(base64Image, sender) {
+        const div = document.createElement("div");
+        div.textContent = `${sender}: `;
+        const img = document.createElement("img");
+        img.src = `data:image/*;base64,${base64Image}`;
+        img.style.maxWidth = "100%";
+        div.appendChild(img);
+        chatDiv.appendChild(div);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
 
-// const socket = io();
+      // Append video messages
+      function appendVideoMessage(base64Video, sender) {
+        const div = document.createElement("div");
+        div.textContent = `${sender}: `;
+        const video = document.createElement("video");
+        video.controls = true;
+        video.src = `data:video/*;base64,${base64Video}`;
+        video.style.maxWidth = "100%";
+        div.appendChild(video);
+        chatDiv.appendChild(div);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
 
-// Add a variable to store the current user's ID
-let currentUserId = null;
+      // Handle incoming messages
+      //         socket.on('chat message', (msg) => {
+      //     if (msg.type === 'text') {
+      //         appendMessage(msg.data, 'text'); // Text messages
+      //     } else if (msg.type === 'audio') {
+      //         appendAudioMessage(msg.data, 'Other'); // Audio messages
+      //     } else if (msg.type === 'image') {
+      //         appendImageMessage(msg.data, 'Other'); // Image messages
+      //     } else if (msg.type === 'video') {
+      //         appendVideoMessage(msg.data, 'Other'); // Video messages
+      //     }
+      // });
 
-// Set the current user's ID upon connection
-socket.on('connect', () => {
-    currentUserId = socket.id;
-});
+      // const socket = io();
 
-// Handle incoming messages
-socket.on('chat message', (msg) => {
-    if (msg.sender !== socket.id) { // Check if the sender is not this client
-        const senderType = 'Other';
-        if (msg.type === 'text') {
-            appendMessage(`${senderType}: ${msg.data}`, 'text');
-        } else if (msg.type === 'audio') {
+      // Add a variable to store the current user's ID
+      let currentUserId = null;
+
+      // Set the current user's ID upon connection
+      socket.on("connect", () => {
+        currentUserId = socket.id;
+      });
+
+      // Handle incoming messages
+      socket.on("chat message", (msg) => {
+        if (msg.sender !== socket.id) {
+          // Check if the sender is not this client
+          const senderType = "Other";
+          if (msg.type === "text") {
+            appendMessage(`${senderType}: ${msg.data}`, "text");
+          } else if (msg.type === "audio") {
             appendAudioMessage(msg.data, senderType);
-        } else if (msg.type === 'image') {
+          } else if (msg.type === "image") {
             appendImageMessage(msg.data, senderType);
-        } else if (msg.type === 'video') {
+          } else if (msg.type === "video") {
             appendVideoMessage(msg.data, senderType);
+          }
         }
-    }
-});
-
-
-
+      });
     </script>
-</body>
+  </body>
 </html>

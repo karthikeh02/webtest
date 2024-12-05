@@ -52,4 +52,4 @@ def handle_disconnect():
     print("A user disconnected:", request.sid)
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=3001, debug=True)
+    socketio.run(app, host='3.7.253.47', port=3001, debug=True)
